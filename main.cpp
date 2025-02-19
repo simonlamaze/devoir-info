@@ -305,6 +305,80 @@ bool cango(piece* pièce , square s , int board[8][8], array<piece*,16> WhitePie
         return false ;
     }
 }
+// une fonction qui calcule un score matériel selon les formules classiques associant un prix à chaque pièce (  P=1 , F,C= 3, T=5 , D=9)
+int prix(piece* pièce) {
+    if (pièce->name =="Pawn") {
+        return 1;
+    }
+    if (pièce->name =="Fou") {
+        return 3;
+    }
+    if (pièce->name =="Cavalier") {
+        return 3;
+    }
+    if (pièce->name =="Tour") {
+        return 5;
+    }
+    if (pièce->name =="Dame") {
+        return 9;
+    }
+    return 0 ;
+}
+
+
+int scorematériel (int board[8][8], array<piece*, 16> WhitePieces , array<piece*, 16> BlackPieces, int Player) {
+    array<piece* , 16> piècesjoueur ;
+    array<piece* , 16> piècesautrejoueur ;
+    if (  Player == 1) {
+        piècesjoueur = WhitePieces;
+        piècesautrejoueur = BlackPieces;
+    } else if (Player == 2) {
+        piècesjoueur = BlackPieces;
+        piècesautrejoueur = WhitePieces;
+    }
+    int SM=0;
+    for (int i = 1; i<16 ;i++) {
+        if (!piècesjoueur[i]->currsq.equal(nullsq)) {
+            SM += prix(piècesjoueur[i]);
+        }
+        if (!piècesautrejoueur[i]->currsq.equal(nullsq)) {
+            SM += -prix(piècesautrejoueur[i]);
+        }
+    }
+    return SM;
+}
+int score(square cs) {
+    if (2<=cs.col<=5 && 2<=cs.row<=5) {
+        return 2;
+    }
+    return 1 ;
+}
+
+int scoreactivité (int board[8][8], array<piece*, 16> WhitePieces , array<piece*, 16> BlackPieces, int Player) {
+    array<piece* , 16> piècesjoueur ;
+
+    if (  Player == 1) {
+        piècesjoueur = WhitePieces;
+
+    } else if (Player == 2) {
+        piècesjoueur = BlackPieces;
+    }
+    int SA = 0 ;
+    for (int i = 1; i<8; i++) {
+        for (int j=1; j<8; j++) {
+            bool controllé = false;
+            for (piece* pièce : piècesjoueur) {
+                if (cango(pièce,square(i,j),board, WhitePieces, BlackPieces)) {
+                    SA+=score(square(i,j));
+                }
+            }
+        }
+    }
+    return SA;
+
+}
+// Maintenant on calcule la fonction de score global
+
 
 // On a une liste de pièces dont on fera évoluer l'état au fur et à mesure de la partie
 // maintenant une question qui teste la légalité d'un coup
@@ -395,7 +469,7 @@ array<bool, 2> roquespossible(int board[8][8], array<piece*, 16> WhitePieces, ar
         roquesp[0]=false;
         // pas de petit roque si une des cases est occupée
     }
-    cout<< roquesp[0]<< ","<<roquesp[1]<<endl;
+
     return roquesp;
     // J'ai presque pris toutes les possibilités en compte , cette fonction peut être améliorée mais ce serait moche et long
 }
@@ -549,7 +623,7 @@ bool legalMove ( int board[8][8],array<piece* , 16> &WhitePieces,array<piece*, 1
 
 // Une fonction qui teste si un joueur est en échec dans une position donnée
 
-
+// une fonction de score global
 
 
 
@@ -646,6 +720,36 @@ bool ischeckmate(int board[8][8] ,int Player,array<piece* , 16> WhitePieces,arra
     return false ;
 }
 
+bool isstalemate(int board[8][8] ,int Player,array<piece* , 16> WhitePieces,array<piece*, 16> BlackPieces){
+    //je ferai cette fonction une fois que j'arrive à vérifier la légalité des coups correctement
+    if (ischeck(board, Player, WhitePieces, BlackPieces)) {
+        return false;
+    }
+
+    vector<coup*>  coupslégaux={}; // il faudra définir une liste de coups légaux un jour où l'autre .
+    coupslégaux = legalmoves(board , WhitePieces , BlackPieces , Player);
+    if (coupslégaux.empty()) {
+        return true;
+    }
+    return false ;
+}
+
+int scoreg (int board[8][8] ,int Player , array<piece* , 16> WhitePieces,array<piece*, 16> BlackPieces) { // calcule le score du point de vue de Player
+    int SM =scorematériel(board  , WhitePieces,  BlackPieces, Player);
+    int SA = scoreactivité(board , WhitePieces , BlackPieces, Player);
+    int S = SA + SM * 5 ;
+    if (ischeckmate(board, 3-Player, WhitePieces, BlackPieces)) {
+        S+=1000 ;
+
+    }
+    if (isstalemate(board, 3-Player, WhitePieces, BlackPieces)) {
+       return 0;
+
+    }
+    return S ;
+
+}
+
 int main()  {
 
     piece WK = piece("Roi", 1, square(5, 1), nomoves) , WQ =piece("Dame" , 1 , square  (4 ,1) , nomoves) , WRa = piece("Tour" , 1 , square  (1 ,1) , nomoves), WRh =piece("Tour" , 1 , square  (8 ,1) , nomoves);
@@ -681,7 +785,7 @@ int main()  {
 
     print_b(board , WhitePieces, BlackPieces);
 
-    
+
     // On a initialisé l'état des cases , maintenant il va falloir ariver à afficher cela avec SDL , youpi
     while (!GameEnd) {
 
@@ -709,7 +813,7 @@ int main()  {
         }
         // On a un coup légal désormais
         // On change l'état de l'échiquier
-
+        int rangprom = 14 - 7* Player ;
         array<piece* , 16> piècesjoueur ;
         array<piece* , 16> piècesautrejoueur ;
         int rowroque = -7+Player*7;
@@ -762,8 +866,12 @@ int main()  {
             piecejouee->currsq = square(Newmove.endsq.col+1,Newmove.endsq.row+1);
             pieceprise->currsq = nullsq; // même si aucune pièce n'est prise cela marche
             if (piecejouee->name=="Pawn" )  {
+                if (Newmove.endsq.row==rangprom) {
+                    cout<< "En quelle pièce vous promouvez vous ? "<<endl;
+                    cin >> piecejouee->name;
+                }
                 if (abs(arrow.col)==1 && abs(arrow.row)==1) {
-                    cout<<"Pff"<<endl;
+
                     if (board[Newmove.endsq.col][Newmove.endsq.row] == 0) {
                         sqtemp.print();
                         piece* piecepriseep = getpiece(sqtemp,WhitePieces,BlackPieces);
@@ -792,10 +900,16 @@ int main()  {
 
 
         print_b( board , WhitePieces,  BlackPieces);
-        GameEnd = ischeckmate(  board , Player ,WhitePieces ,BlackPieces);
-        if (GameEnd) {
+
+        if (ischeckmate(  board , Player ,WhitePieces ,BlackPieces)) {
             cout<<"Echec et Mat! "<<endl;
-            break;
+            GameEnd =true ;
+
+        }
+        if (isstalemate(  board , Player ,WhitePieces ,BlackPieces)) {
+            cout<<"Pat! Match nul!"<<endl;
+            GameEnd =true ;
+
         }
 
 
