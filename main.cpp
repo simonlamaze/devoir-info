@@ -6,6 +6,10 @@
 #include <stdio.h>
 
 #include "pieces.h"
+#include <cstdlib>
+#include <ctime>
+
+
 using namespace std;
 coup nomoves = coup( square (0,0) , square (0,0));
 square nullsq = square(0,0); // la case des pièces prises
@@ -13,6 +17,20 @@ piece nullpc = piece("King",1,nullsq,nomoves);
 coup grandroque = coup( square (10,10) , square (100,100));
 coup petitroque = coup( square (100,100) , square (10,10));
 // Des constructeurs par défaut, en attendant d'en avoir
+
+
+int argmin(vector<int> paps ) {
+    int argmin=0 ;
+    int min = paps[0];
+    for (int i =0; i<paps.size(); i++) {
+        if (paps[i] < min) {
+            min = paps[i];
+            argmin = i;
+        }
+
+    }
+    return argmin;
+}
 
 void print_piece(piece* p) {
     cout<<p->name<<","<<p-> color << " ,"<< p->currsq.col<< p->currsq.row<<endl;
@@ -119,7 +137,6 @@ bool cango(piece* pièce , square s , int board[8][8], array<piece*,16> WhitePie
         square arrow = currsqb.difference(s);
         if (square(s.col +1, s.row +1).state(board)== pièce->color ){
             return false ;
-            cout<<"hop"<<endl;
         } // On vérifie que l'on n'atterrit pas sur une case de la même couleur
 
         else if (abs(arrow.col)==2){
@@ -208,7 +225,7 @@ bool cango(piece* pièce , square s , int board[8][8], array<piece*,16> WhitePie
                     if (pièce->currsq.row!=5) {
                         return false;
                     }
-                    cout<<"hip"<<endl;
+
 
                     piece* pn = getpiece(square(pièce->currsq.col + arrow.col , pièce->currsq.row), WhitePieces, BlackPieces);
                     if (pn->name!="Pawn") {
@@ -749,6 +766,206 @@ int scoreg (int board[8][8] ,int Player , array<piece* , 16> WhitePieces,array<p
     return S ;
 
 }
+void playmoveIA(int board[8][8] ,int Player , array<piece* , 16> WhitePieces,array<piece*, 16> BlackPieces , coup Newmove , bool enpassant ,
+        bool promotion ,
+        int rowroque ,
+        piece* piecepl ,
+        piece* piecetk ) {
+    int rangprom = 14 - 7* Player ;
+    array<piece* , 16> piècesjoueur ;
+    array<piece* , 16> piècesautrejoueur ;
+    int rowroque = -7+Player*7;
+    if (  Player == 1) {
+        piècesjoueur = WhitePieces;
+        piècesautrejoueur = BlackPieces;
+    } else if (Player == 2) {
+        piècesjoueur = BlackPieces;
+        piècesautrejoueur = WhitePieces;
+    }
+    if (samemove(Newmove,grandroque)) {
+        show_board(board);
+        piècesjoueur[0]->currsq = square(3,rowroque +1);
+        piècesjoueur[2]->currsq = square(4,rowroque +1 );
+        // on change les cases des pièces, puis board
+        board[0][rowroque] = 0 ;
+        board[2][rowroque] = Player ;
+        board[3][rowroque] = Player;
+        board[4][rowroque] = 0 ;
+    }
+
+
+    else if (samemove(Newmove,petitroque)) {
+        piècesjoueur[0]->currsq = square(7,rowroque +1);
+        piècesjoueur[3]->currsq = square(6,rowroque +1 );
+        // on change les cases des pièces, puis board
+        board[7][rowroque] = 0 ;
+        board[6][rowroque] = Player ;
+        board[5][rowroque] = Player ;
+        board[4][rowroque] = 0 ;
+
+    }
+
+        // on a vérifié que le coup n'était pas un roque, si ça l'était on a fait les changements inhérents .
+    else {
+        // Si pas de roque
+
+
+
+
+        // Vérifions que l'on n'a pas fait une prise en passant:
+
+        piece* piecejouee = getpiece(square(Newmove.begsq.col+1,Newmove.begsq.row+1),WhitePieces , BlackPieces);
+        piece* pieceprise= getpiece(square(Newmove.endsq.col+1,Newmove.endsq.row+1),WhitePieces , BlackPieces);
+
+        square arrow = Newmove.begsq.difference(Newmove.endsq);
+        square sqtemp = square(piecejouee->currsq.col+arrow.col,piecejouee->currsq.row); // sert uniquement si on repère une prise en passant
+        piecejouee->currsq = square(Newmove.endsq.col+1,Newmove.endsq.row+1);
+        pieceprise->currsq = nullsq; // même si aucune pièce n'est prise cela marche
+        if (piecejouee->name=="Pawn" )  {
+            if (Newmove.endsq.row==rangprom) {
+                piecejouee->name = "Dame";
+            }
+            if (abs(arrow.col)==1 && abs(arrow.row)==1) {
+
+                if (board[Newmove.endsq.col][Newmove.endsq.row] == 0) {
+                    sqtemp.print();
+                    piece* piecepriseep = getpiece(sqtemp,WhitePieces,BlackPieces);
+                    print_pieces(BlackPieces);
+                    piecepriseep->currsq = nullsq;
+                    board[sqtemp.col-1][sqtemp.row-1] = 0 ;
+
+                }
+            }
+        }
+
+        board[Newmove.begsq.col][Newmove.begsq.row] = 0;
+        board[Newmove.endsq.col][Newmove.endsq.row] = Player;
+
+
+
+        print_b( board , WhitePieces,  BlackPieces);
+        if (ischeck(board, Player , WhitePieces, BlackPieces)) {
+            cout<<"Echec ! "<<endl;
+        }
+
+        if (ischeckmate(  board , Player ,WhitePieces ,BlackPieces)) {
+            cout<<"Echec et Mat! "<<endl;
+
+
+        }
+        if (isstalemate(  board , Player ,WhitePieces ,BlackPieces)) {
+            cout<<"Pat! Match nul!"<<endl;
+
+
+        }
+    }
+}
+
+void unplaymoveIA(int board[8][8] ,int Player , array<piece* , 16> WhitePieces,array<piece*, 16> BlackPieces , coup Newmove,bool enpassant ,
+        bool promotion,
+        int rowroque ,
+        piece* piecepl ,
+        piece* piecetk ) {
+    int rangprom = 14 - 7* Player ;
+    array<piece* , 16> piècesjoueur ;
+    array<piece* , 16> piècesautrejoueur ;
+    int rowroque = -7+Player*7;
+    if (  Player == 1) {
+        piècesjoueur = WhitePieces;
+        piècesautrejoueur = BlackPieces;
+    } else if (Player == 2) {
+        piècesjoueur = BlackPieces;
+        piècesautrejoueur = WhitePieces;
+    }
+    if (samemove(Newmove,grandroque)) {
+        show_board(board);
+        piècesjoueur[0]->currsq = square(3,rowroque +1);
+        piècesjoueur[2]->currsq = square(4,rowroque +1 );
+        // on change les cases des pièces, puis board
+        board[0][rowroque] = 0 ;
+        board[2][rowroque] = Player ;
+        board[3][rowroque] = Player;
+        board[4][rowroque] = 0 ;
+    }
+
+
+    else if (samemove(Newmove,petitroque)) {
+        piècesjoueur[0]->currsq = square(7,rowroque +1);
+        piècesjoueur[3]->currsq = square(6,rowroque +1 );
+        // on change les cases des pièces, puis board
+        board[7][rowroque] = 0 ;
+        board[6][rowroque] = Player ;
+        board[5][rowroque] = Player ;
+        board[4][rowroque] = 0 ;
+
+    }
+
+    // on a vérifié que le coup n'était pas un roque, si ça l'était on a fait les changements inhérents .
+    else {
+        // Si pas de roque
+
+
+
+
+        // Vérifions que l'on n'a pas fait une prise en passant:
+
+        piece* piecejouee = getpiece(square(Newmove.begsq.col+1,Newmove.begsq.row+1),WhitePieces , BlackPieces);
+        piece* pieceprise= getpiece(square(Newmove.endsq.col+1,Newmove.endsq.row+1),WhitePieces , BlackPieces);
+
+        square arrow = Newmove.begsq.difference(Newmove.endsq);
+        square sqtemp = square(piecejouee->currsq.col+arrow.col,piecejouee->currsq.row); // sert uniquement si on repère une prise en passant
+        piecejouee->currsq = square(Newmove.endsq.col+1,Newmove.endsq.row+1);
+        pieceprise->currsq = nullsq; // même si aucune pièce n'est prise cela marche
+        if (piecejouee->name=="Pawn" )  {
+            if (Newmove.endsq.row==rangprom) {
+                piecejouee->name = "Dame";
+            }
+            if (abs(arrow.col)==1 && abs(arrow.row)==1) {
+
+                if (board[Newmove.endsq.col][Newmove.endsq.row] == 0) {
+                    sqtemp.print();
+                    piece* piecepriseep = getpiece(sqtemp,WhitePieces,BlackPieces);
+                    print_pieces(BlackPieces);
+                    piecepriseep->currsq = nullsq;
+                    board[sqtemp.col-1][sqtemp.row-1] = 0 ;
+
+                }
+            }
+        }
+
+        board[Newmove.begsq.col][Newmove.begsq.row] = 0;
+        board[Newmove.endsq.col][Newmove.endsq.row] = Player;
+    }
+}
+void IAnulle(int board[8][8] ,int Player , array<piece* , 16> WhitePieces,array<piece*, 16> BlackPieces ){
+
+    vector<coup*> cpspossibles =  legalmoves ( board,WhitePieces ,  BlackPieces, Player);
+    int N = cpspossibles.size();
+    vector<int> scores ;
+    //for (int i = 0; i < N; i++) {
+    //    coup cps = *cpspossibles[i];
+    //    bool enpassant = false;
+    //    bool promotion =false ;
+    //    int rowroque =  7+Player*7;
+    //    piece* piecepl = &nullpc;
+    //    piece* piecetk = &nullpc;
+    //    playmoveIA(board,Player ,WhitePieces, BlackPieces ,cps ,enpassant, promotion, rowroque, piecepl , piecetk);
+    //    int a = scoreg(board, Player,WhitePieces , BlackPieces);
+    //    unplaymoveIA(board,Player ,WhitePieces, BlackPieces ,cps ,enpassant, promotion, rowroque, piecepl , piecetk);
+    //} these were part of a far better IA
+    std::srand(std::time(0));
+    // Générer un entier aléatoire entre 0 et N-1
+    int ab =  std::rand() % (N );
+    coup Newmove = *cpspossibles[ab];
+    bool enpassant = false;
+    bool promotion =false ;
+    int rowroque =  7+Player*7;
+    piece* piecepl = &nullpc;
+    piece* piecetk = &nullpc;
+
+
+    playmoveIA(board,Player ,WhitePieces, BlackPieces ,Newmove ,enpassant, promotion, rowroque, piecepl , piecetk);
+}
 
 int main()  {
 
@@ -884,7 +1101,7 @@ int main()  {
             }
 
             board[Newmove.begsq.col][Newmove.begsq.row] = 0;
-            board[Newmove.endsq.col][Newmove.endsq.row] = Player; // à noter que la prise en passant reste pssible plus d'un coup après ( à ne pas faire donc)(c'est réglable en gardant en mémoire le coup précédetn, mais je préfère essayer de programmer une petite IA
+            board[Newmove.endsq.col][Newmove.endsq.row] = Player;
         }
 
 
@@ -911,7 +1128,9 @@ int main()  {
             GameEnd =true ;
 
         }
-
+        // Maintenant on fait jouer l'IA
+         IAnulle( board,  Player ,  WhitePieces, BlackPieces);
+        Player=3-Player;
 
     }
     cout<< "Fin de la partie"<< endl ;
